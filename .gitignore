@@ -1,3 +1,5 @@
 Dataset/
+Data/
 CodeSim/model/models/
 *.pt
+*.csv
