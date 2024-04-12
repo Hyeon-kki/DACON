@@ -29,15 +29,10 @@ def preprocessing(train_x, test_x):
     'redCards(awayTeam)'
     ]
 
-    ''' match feature create '''
-    train_x['match'] = train_x['homeTeam'] + '-' + train_x['awayTeam']
-    test_x['match'] = test_x['homeTeam'] + '-' + test_x['awayTeam']
-
     ''' test feature interpolation '''
     latest_two_season_df = train_x[train_x['season'] >= 202324]
     pair_stats = latest_two_season_df.groupby('match')[stats_columns].mean().reset_index() 
     test_x_with_stats = test_x.merge(pair_stats, on='match', how='left')
-
 
     # 2부리그에서 1부리그로 처음 올라온 팀은 그전에 경기기록이 없다. 따라서, 평균으로 값 대체 
     test_x_with_stats.fillna(pair_stats[stats_columns].mean(), inplace=True) # pair_stats mean
@@ -45,6 +40,7 @@ def preprocessing(train_x, test_x):
 
     # label encoding
     encoding_target = list(train_x.dtypes[train_x.dtypes == "object"].index)
+    print(encoding_target)
     for i in encoding_target:
         le = LabelEncoder()
         le.fit(train_x[i])
@@ -57,7 +53,7 @@ def preprocessing(train_x, test_x):
         
         test_x[i] = le.transform(test_x[i])
 
-    # scaler (오히려 성능저하)
+    # Scaler 
     # scaler = StandardScaler()
     # train_x = scaler.fit_transform(train_x)
     # test_x = scaler.transform(test_x)
