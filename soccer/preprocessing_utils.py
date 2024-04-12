@@ -30,8 +30,11 @@ def preprocessing(train_x, test_x):
     ]
 
     ''' test feature interpolation '''
-    latest_two_season_df = train_x[train_x['season'] >= 202324]
-    pair_stats = latest_two_season_df.groupby('match')[stats_columns].mean().reset_index() 
+    # 모든 시즌에 대해서 진행해보았으나 valid에서 202324 시즌 만 했을 때가 성능이 가장 좋았다. 
+    # latest_two_season_df = train_x[train_x['season'] >= 202324]
+    # pair_stats = latest_two_season_df.groupby('match')[stats_columns].mean().reset_index() 
+    
+    pair_stats = train_x.groupby('match')[stats_columns].mean().reset_index() 
     test_x_with_stats = test_x.merge(pair_stats, on='match', how='left')
 
     # 2부리그에서 1부리그로 처음 올라온 팀은 그전에 경기기록이 없다. 따라서, 평균으로 값 대체 
@@ -40,7 +43,6 @@ def preprocessing(train_x, test_x):
 
     # label encoding
     encoding_target = list(train_x.dtypes[train_x.dtypes == "object"].index)
-    print(encoding_target)
     for i in encoding_target:
         le = LabelEncoder()
         le.fit(train_x[i])
@@ -53,7 +55,7 @@ def preprocessing(train_x, test_x):
         
         test_x[i] = le.transform(test_x[i])
 
-    # Scaler 
+    # Scaler (성능하락)
     # scaler = StandardScaler()
     # train_x = scaler.fit_transform(train_x)
     # test_x = scaler.transform(test_x)

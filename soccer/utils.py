@@ -2,10 +2,11 @@ import pandas as pd
 
 def load_train_valid():
     train = pd.read_csv('/home/workspace/DACON/soccer/Data/train.csv')
+    
     # sm의 Logit 모듈 쓸려고 전처리 한것
     # train = train[train['result'] != 'D']
     # train.reset_index(inplace=True, drop= True)
-    test = train[-88:][['season', 'homeTeam', "awayTeam", 'date']]
+    valid_x = train[-88:][['season', 'homeTeam', "awayTeam", 'date']]
     train = train[:-88]
     valid_y = train[-88:]['result']
 
@@ -16,16 +17,15 @@ def load_train_valid():
     train.drop(columns=['date'], inplace=True)
 
     # valid date 처리
-    test['year'] = test['date'].apply(lambda x : int(x[0:4]))
-    test['month'] = test['date'].apply(lambda x : int(x[5:7]))
-    test['day'] = test['date'].apply(lambda x : int(x[8:10]))
-    test.drop(columns=['date'], inplace=True)
+    valid_x['year'] = valid_x['date'].apply(lambda x : int(x[0:4]))
+    valid_x['month'] = valid_x['date'].apply(lambda x : int(x[5:7]))
+    valid_x['day'] = valid_x['date'].apply(lambda x : int(x[8:10]))
 
     #  match feature create 
     train['match'] = train['homeTeam'] + '-' + train['awayTeam']
-    test['match'] = test['homeTeam'] + '-' + test['awayTeam']
+    valid_x['match'] = valid_x['homeTeam'] + '-' + valid_x['awayTeam']
 
-    # hometeam / awayteam label encoding
+    # hometeam / awayteam label encoding ( Test에서 성능 향상)
     train['home_win'] = train['result'].apply(lambda x: 1 if x=='H' else 0) 
     dic = {}
     for team in train['homeTeam'].unique():
@@ -38,14 +38,13 @@ def load_train_valid():
 
     train['homeTeam'] = train['homeTeam'].apply(lambda x: label_dic[x])
     train['awayTeam'] = train['awayTeam'].apply(lambda x: label_dic[x])
-    test['homeTeam'] = test['homeTeam'].apply(lambda x: label_dic[x])
-    test['awayTeam'] = test['awayTeam'].apply(lambda x: label_dic[x])
-    test = test.drop(columns=['home_win'])
+    valid_x['homeTeam'] = valid_x['homeTeam'].apply(lambda x: label_dic[x])
+    valid_x['awayTeam'] = valid_x['awayTeam'].apply(lambda x: label_dic[x])
 
     train_x = train.drop(columns=['matchID', 'goals(homeTeam)', 'goals(awayTeam)', 'result', 'home_win'])
     train_y = train['result']
 
-    return train_x, train_y, test, valid_y 
+    return train_x, train_y, valid_x, valid_y 
 
 def load_train_test():
     train = pd.read_csv('/home/workspace/DACON/soccer/Data/train.csv')
@@ -61,7 +60,6 @@ def load_train_test():
     test['year'] = test['date'].apply(lambda x : int(x[0:4]))
     test['month'] = test['date'].apply(lambda x : int(x[5:7]))
     test['day'] = test['date'].apply(lambda x : int(x[8:10]))
-    test.drop(columns=['date'], inplace=True)
     
     #  match feature create 
     train['match'] = train['homeTeam'] + '-' + train['awayTeam']
@@ -81,7 +79,6 @@ def load_train_test():
     train['awayTeam'] = train['awayTeam'].apply(lambda x: label_dic[x])
     test['homeTeam'] = test['homeTeam'].apply(lambda x: label_dic[x])
     test['awayTeam'] = test['awayTeam'].apply(lambda x: label_dic[x])
-    test = test.drop(columns=['home_win'])
 
     train_x = train.drop(columns=['matchID', 'goals(homeTeam)', 'goals(awayTeam)', 'result', 'home_win'])
     train_y = train['result']
