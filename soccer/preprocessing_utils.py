@@ -8,6 +8,20 @@ from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler 
 
+
+def team_encoding(train):
+    train['home_win'] = train['result'].apply(lambda x: 1 if x=='H' else 0) 
+    dic = {}
+    for team in train['homeTeam'].unique():
+        value = train[train['homeTeam'] == team]['home_win'].sum()
+        dic[team] = value
+
+    label_dic={}
+    for idx, (team, _) in enumerate(sorted(dic.items(), key= lambda x: x[1])):
+        label_dic[team] = idx
+    
+    return label_dic
+
 def EWMA(train, test, columns):
     df_columns = ['match'] + columns
     ema_onMatch = pd.DataFrame(columns = df_columns)
@@ -21,8 +35,8 @@ def EWMA(train, test, columns):
 
 def get_outlier(df=None, column=None, weight=1.5):
   # target 값과 상관관계가 높은 열을 우선적으로 진행
-  quantile_25 = np.percentile(df[column].values, 25)
-  quantile_75 = np.percentile(df[column].values, 75)
+  quantile_25 = np.percentile(df[column].values, 15)
+  quantile_75 = np.percentile(df[column].values, 85)
 
   IQR = quantile_75 - quantile_25
   IQR_weight = IQR*weight
@@ -160,7 +174,7 @@ def away_day_mean(train, test, columns, day):
         test[f'away_{column}_{day}mean'] = test[f'away_{column}_{day}mean'].fillna(0)
 
 
-def preprocessing(train, test, is_test=False):
+def preprocessing(train, test, dic, is_test=False):
     # Date col preprocessing
     train['year'] = train['date'].apply(lambda x : int(x[0:4]))
     train['month'] = train['date'].apply(lambda x : int(x[5:7]))
@@ -169,30 +183,18 @@ def preprocessing(train, test, is_test=False):
     test['month'] = test['date'].apply(lambda x : int(x[5:7]))
     test['day'] = test['date'].apply(lambda x : int(x[8:10]))
     train.drop(columns=['date'], inplace=True)
+    test.drop(columns=['date'], inplace=True)
 
     #  match feature create 
     train['match'] = train['homeTeam'] + '-' + train['awayTeam']
     test['match'] = test['homeTeam'] + '-' + test['awayTeam']
-
-    # 해당 시즌만 가지고 훈련
-
-
 
     # homeTeam awayTeam  최근 3경기 득점량 평균  
     # home_day_mean(train, test, ['halfTimeGoals(homeTeam)', "shots(homeTeam)", 'shotsOnTarget(homeTeam)', 'corners(homeTeam)'], 5)
     # away_day_mean(train, test, ['halfTimeGoals(awayTeam)', 'shots(awayTeam)', 'shotsOnTarget(awayTeam)', 'corners(awayTeam)'], 5)
 
     # hometeam / awayteam label encoding ( Test에서 성능 향상)
-    train['home_win'] = train['result'].apply(lambda x: 1 if x=='H' else 0) 
-    dic = {}
-    for team in train['homeTeam'].unique():
-        value = train[train['homeTeam'] == team]['home_win'].sum()
-        dic[team] = value
-
-    label_dic={}
-    for idx, (team, _) in enumerate(sorted(dic.items(), key= lambda x: x[1])):
-        label_dic[team] = idx
-
+    label_dic = dic
     train['homeTeam'] = train['homeTeam'].apply(lambda x: label_dic[x])
     train['awayTeam'] = train['awayTeam'].apply(lambda x: label_dic[x])
     test['homeTeam'] = test['homeTeam'].apply(lambda x: label_dic[x])
@@ -201,6 +203,7 @@ def preprocessing(train, test, is_test=False):
     # 일정 기간 승리 비율 (성능 향상)
     homeWin_day_mean(train, test, 5)
     awayWin_day_mean(train, test, 5)
+
     # 성능 하락
     # homeWin_day_mean(train, test, 10)
     # awayWin_day_mean(train, test, 10)
@@ -209,8 +212,8 @@ def preprocessing(train, test, is_test=False):
     # homeWin_day_mean(train, test, 20)
 
     # 일정 기간 평균 골 비율 (성능 향상)
-    # homeGoal_day_mean(train, test, 10)
-    # awayGoal_day_mean(train, test, 10)
+    homeGoal_day_mean(train, test, 6)
+    awayGoal_day_mean(train, test, 6)
 
 
     # feature selection
