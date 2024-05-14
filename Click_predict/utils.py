@@ -3,9 +3,11 @@ import numpy as np
 import random
 import os
 import duckdb
+from tqdm import tqdm
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score
+from sklearn.preprocessing import TargetEncoder
 
 def seed_everything(seed):
     random.seed(seed)
@@ -65,12 +67,45 @@ def preprocessing(df, is_test = False):
     object_col = df.select_dtypes(include=['object']).columns
 
     ''' 결측치 처리 ''' 
-    for col in numeric_col:
+    print("---------------- Start MissingValue ----------------")
+    for col in tqdm(numeric_col):
         df[col] = df[col].fillna(0)
-    for col in object_col:
+    for col in tqdm(object_col):
         df[col] = df[col].fillna('NaN')
+    # 실험1 (결측값 수가 같은 것끼리 동일한 결측값 채우기)
+    # missing_same_list=[]
+    # missing_same_list.append(["F01", "F02", "F05", "F10", "F12", "F34"]) # Object
+    # missing_same_list.append(["F03", "F15", "F20", "F26" ]) # Object
+    # missing_same_list.append(["F19", "F33"]) # Float
+    # missing_same_list.append(["F27", "F29"]) # Float
+    # O_iter,N_iter = 0, 0 # 둘 다 2까지 갈 듯
+    # for list in missing_same_list:
+    #     feature_type = df[list[0]].dtype
+    #     for feature in list:
+    #         if feature_type == 'object':
+    #             df[feature].fillna('NaN'+str(O_iter))
+    #             O_iter += 1
+    #         else:
+    #             df[feature].fillna(N_iter)
+    #             N_iter += 1
+    # for col in numeric_col:
+    #     df[col] = df[col].fillna(-1)
+    # for col in object_col:
+    #     df[col] = df[col].fillna('NaNK')
+    
+    ''' 카테고리 F01 수정'''
+    print("---------------- Start Category ----------------")
+    same_MissingValue = ["F01", "F02", "F05", "F10", "F12", "F34"]
+    for col in tqdm(same_MissingValue):
+        F01_Ndic = df[col].value_counts()
+        df[col] = df[col].apply(lambda x: "etc" if F01_Ndic[x] < 10 else x)
+
+
+    # F01_Ndic = df['F01'].value_counts()
+    # df['F01'] = df['F01'].apply(lambda x: "etc" if F01_Ndic[x] < 100 else x)
 
     ''' 메모리 사용량 줄임 '''
+    print("---------------- Change Dtype ----------------")
     float_columns = df.select_dtypes(include=['float64']).columns
     df[float_columns] = df[float_columns].astype('int64')
     df[object_col] = df[object_col].astype('category')
