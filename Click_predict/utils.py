@@ -198,7 +198,7 @@ def preprocessing(df, is_test = False):
         df[col] = df[col].fillna('NaN')
 
     ''' groupby 실험 '''
-    df = groupby_mean(df, "F15",  numeric_col)
+    # df = groupby_mean(df, "F15",  numeric_col)
 
     ''' log 변환 (실험1)''' # 성능에 변화없음 
     # df['F29_log'] = np.log(df['F29'] + 1) 
@@ -206,7 +206,7 @@ def preprocessing(df, is_test = False):
     ''' 추가 '''
     # df['F09_F07'] = df['F09']+df['F07'] # 0.778695906242
     # df['F09_F25'] = df['F09']+df['F25'] # 0.7787953
-    df['F2729_add'] = df['F27']+df['F29'] #0.7790
+    # df['F2729_add'] = df['F27']+df['F29'] # 성능 향상됨 (사용하기)
     # df['F2729_mul'] = df['F27']*df['F29'] # 
 
 
