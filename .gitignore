@@ -3,3 +3,12 @@ Data/
 CodeSim/model/models/
 *.pt
 *.csv
+*.tsv
+*.pyc
+*.zip
+*.tfevents
+*.tmp
+Click_predict/__pycache__/
+Click_predict/Model/catboost_info/
+Click_predict/__pycache__/
+Click_predict/data/
