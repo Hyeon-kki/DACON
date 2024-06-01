@@ -8,8 +8,8 @@ from tqdm import tqdm
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score
-from sklearn.preprocessing import TargetEncoder
 from sklearn.preprocessing import MinMaxScaler
+import category_encoders as ce
 
 def feature_summary(df):
     temp = 'Dataframe Size'
@@ -46,7 +46,40 @@ def load_data_polars():
 def load_data():
     train = pd.read_csv('/home/workspace/DACON/Click_predict/data/train.csv') 
     test = pd.read_csv('/home/workspace/DACON/Click_predict/data/test.csv')
-    return train, test
+    submission = pd.read_csv("/home/workspace/DACON/Click_predict/data/sample_submission.csv")
+
+    return train, test, submission
+    
+''' Optuna '''
+# def objective(trial, train):
+
+#   param = {"n_estimators": trial.suggest_int("n_estimators:", 100, 1000),
+#            "max_depth": trial.suggest_int("max_depth", 6, 30),
+#            "subsample": trial.suggest_float("subsample", 0.3, 1.0),
+#            "learning_rate":  trial.suggest_float("learning_rate", 0.01, 0.3),
+#            'lambda': trial.suggest_float('lambda', 1e-3, 0.1),
+#            'alpha': trial.suggest_float('alpha', 1e-3, 1.0),
+#            'min_child_weight': trial.suggest_int('min_child_weight', 2, 50)}
+  
+#   auc_score = []
+#   X_train = train.drop(columns='Click')
+#   y_train = train['Click']
+#   X_train.reset_index(drop = True, inplace=True)
+#   y_train.reset_index(drop = True, inplace=True)
+
+#   model = XGBClassifier(random_state=42, tree_method= 'gpu_hist', **param)
+#   S_kfold = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+
+#   for iter, (train_index, test_index) in enumerate(S_kfold.split(X_train, y_train)):
+#       x_train, x_test = X_train.iloc[train_index], X_train.iloc[test_index]
+#       y_train, y_test = y_train.iloc[train_index], y_train.iloc[test_index]
+#       model.fit(x_train, y_train, eval_metric='auc')
+#       valid_pred = model.predict_proba(x_test)
+#       score = roc_auc_score(y_test, valid_pred[:, 1])
+#       auc_score.append(score)
+      
+#   avg_score = sum(auc_score)/3
+#   return avg_score
 
 def to_pandas(train, test): #판다스로 바꾸기. 문자형 변수들 카테고리로 변환
     train = train.to_pandas()
@@ -81,7 +114,7 @@ def Kfold(model, k, X_train, Y_train, test, is_test = False):
                 print(soft_voting_value)
                 soft_voting_value += value
                 print(soft_voting_value)
-    soft_voting_value /= k
+    soft_voting_value = soft_voting_value / k
 
     return valid_arrays, test_arrays, soft_voting_value
 
@@ -181,21 +214,42 @@ def groupby_mean(df, group_col, numeric_cols):
         df[f'{group_col}_{numeric_col}_mean'] = df[group_col].map(agg)
     return df
 
-def preprocessing(df, is_test = False):
+def preprocessing(X_train, X_valid, y_train, y_valid, test, is_test = False):
 
     ''' Feature Selection '''
-    df.drop(columns = ['ID'], inplace = True)
-    numeric_col = df.select_dtypes(include=['Float64', 'Float32', 'int64', 'int32', 'int16', 'int8']).columns
+    print('Feature Selection')
+    X_train.drop(columns = ['ID'], inplace = True)
+    X_valid.drop(columns = ['ID'], inplace = True)
+    numeric_col = X_train.select_dtypes(include=['Float64', 'Float32', 'int64', 'int32', 'int16', 'int8']).columns
     if not is_test:
         numeric_col = numeric_col.drop('Click')
-    object_col = df.select_dtypes(include=['object']).columns
+
+    target_col = ["F03", "F08", "F15", "F16", "F17", "F28", "F31"]
+    encoder_1 =  ce.TargetEncoder()
+    X_train[target_col] = encoder_1.fit_transform(X_train[target_col], y_train)
+    X_valid[target_col] = encoder_1.transform(X_valid[target_col], y_valid)
+    test[target_col] = encoder_1.transform(test[target_col])
+
+    object_col = X_train.select_dtypes(include=['object']).columns
+
+    ''' 빈도 인코딩 '''
+    print('Start Frequency')
+    # 각 범주형 변수의 빈도수 계산 및 인코딩
+    encoder_2 =  ce.CountEncoder()
+    X_train[object_col] = encoder_2.fit_transform(X_train[object_col], y_train)
+    X_valid[object_col] = encoder_2.transform(X_valid[object_col], y_valid)
+    test[object_col] = encoder_2.transform(test[object_col])
 
     ''' 결측치 처리 ''' 
+    print('Missing Value')
     print("---------------- Start MissingValue ----------------")
-    for col in tqdm(numeric_col):
-        df[col] = df[col].fillna(0)
-    for col in tqdm(object_col):
-        df[col] = df[col].fillna('NaN')
+    X_train = X_train.fillna(0)
+    X_valid = X_valid.fillna(0)
+    test = test.fillna(0)
+    
+    X_train = reduce_mem_usage(X_train)
+    X_valid = reduce_mem_usage(X_valid)
+    test = reduce_mem_usage(test)
 
     ''' groupby 실험 '''
     # df = groupby_mean(df, "F15",  numeric_col)
@@ -217,12 +271,12 @@ def preprocessing(df, is_test = False):
 
 
     ''' 메모리 사용량 줄임 '''
-    print("---------------- Change Dtype ----------------")
-    df = reduce_mem_usage(df)
-    object_col = df.select_dtypes(include=['object']).columns
-    df[object_col] = df[object_col].astype('category')
+    # print("---------------- Change Dtype ----------------")
+    # df = reduce_mem_usage(df)
+    # object_col = df.select_dtypes(include=['object']).columns
+    # df[object_col] = df[object_col].astype('category')
 
-    return df 
+    return X_train, X_valid, y_train, y_valid, test
 
 
     # 실험1 (결측값 수가 같은 것끼리 동일한 결측값 채우기) (성능 하락)
