@@ -208,11 +208,86 @@ def feature_category(df, feature_list, treshold):
         df[f'{col}_new'] = df[f'{col}_new'].astype('category')
     return df
 
-def groupby_mean(df, group_col, numeric_cols):
-    for numeric_col in numeric_cols:
-        agg = df.groupby(group_col)[numeric_col].mean()
-        df[f'{group_col}_{numeric_col}_mean'] = df[group_col].map(agg)
-    return df
+def groupby_mean(train_df, valid_df, test_df, group_col, numeric_cols):
+    # Dictionary to store the mean values for each numeric column
+    mean_dict = {}
+    
+    for numeric_col in tqdm(numeric_cols):
+        # Calculate mean for train data
+        agg = train_df.groupby(group_col)[numeric_col].mean()
+        mean_dict[numeric_col] = agg
+        
+        # Map the calculated means to train, valid, and test data
+        train_df[f'{group_col}_{numeric_col}_mean'] = train_df[group_col].map(agg)
+        valid_df[f'{group_col}_{numeric_col}_mean'] = valid_df[group_col].map(agg)
+        test_df[f'{group_col}_{numeric_col}_mean'] = test_df[group_col].map(agg)
+    
+    return train_df, valid_df, test_df
+
+# Optuna를 사용하여 하이퍼파라미터 튜닝
+# def objective(trial):
+
+#     # LGBM 하이퍼파라미터
+#     lgbm_params = {
+#         "n_estimators": trial.suggest_int("n_estimators:", 1000, 3000),
+#         "max_depth": trial.suggest_int("max_depth", 6, 30),
+#         #"subsample": trial.suggest_float("subsample", 0.3, 1.0),
+#         "learning_rate":  trial.suggest_float("learning_rate", 0.01, 0.3)}
+    
+
+#     # XGBoost 하이퍼파라미터
+#     xgb_params = {
+#         "n_estimators": trial.suggest_int("n_estimators:", 1000, 3000),
+#         "max_depth": trial.suggest_int("max_depth", 6, 30),
+#         #"subsample": trial.suggest_float("subsample", 0.3, 1.0),
+#         "learning_rate":  trial.suggest_float("learning_rate", 0.01, 0.3)}
+
+#     # k-NN 하이퍼파라미터
+#     knn_params = {
+#         'n_neighbors': trial.suggest_int('knn_n_neighbors', 100, 1000)
+#     }
+
+#     # 로지스틱 회귀 하이퍼파라미터
+#     lr_params = {
+#         'C': trial.suggest_float('lr_C', 0.0001, 100, log=True)
+#     }
+
+#     # 개별 모델 정의
+#     lgbm = LGBMClassifier(device='gpu',**lgbm_params)
+#     xgb = XGBClassifier(random_state=42, tree_method= 'gpu_hist', **xgb_params)
+#     knn = KNeighborsClassifier(**knn_params)
+#     lr = LogisticRegression(**lr_params)
+
+#     # 스태킹 분류기 정의
+#     stacking_clf = StackingClassifier(
+#         estimators=[
+#             ('lgbm', lgbm),
+#             ('xgb', xgb),
+#             ('knn', knn),
+#             ('lr', lr)
+#         ],
+#         final_estimator=LogisticRegression()
+#     )
+
+#     # 모델 학습
+#     stacking_clf.fit(X_train, y_train)
+
+#     # 검증 데이터에 대한 예측
+#     y_valid_pred = stacking_clf.predict_proba(X_valid)[:, 1]
+#     return roc_auc_score(y_valid, y_valid_pred)
+
+# # Optuna 스터디 정의 및 최적화
+# sampler = TPESampler(seed=42)
+# study = optuna.create_study(direction='maximize', sampler=sampler)
+# study.optimize(objective, n_trials=10)
+
+# # 최적 하이퍼파라미터 출력
+# print("Best trial:")
+# trial = study.best_trial
+# print(f"  AUC: {trial.value:.4f}")
+# print("  Params: ")
+# for key, value in trial.params.items():
+#     print(f"    {key}: {value}")
 
 def preprocessing(X_train, X_valid, y_train, y_valid, test, is_test = False):
 
@@ -224,11 +299,11 @@ def preprocessing(X_train, X_valid, y_train, y_valid, test, is_test = False):
     if not is_test:
         numeric_col = numeric_col.drop('Click')
 
-    target_col = ["F03", "F08", "F15", "F16", "F17", "F28", "F31"]
-    encoder_1 =  ce.TargetEncoder()
-    X_train[target_col] = encoder_1.fit_transform(X_train[target_col], y_train)
-    X_valid[target_col] = encoder_1.transform(X_valid[target_col], y_valid)
-    test[target_col] = encoder_1.transform(test[target_col])
+    # target_col = ["F03", "F08", "F15", "F16", "F17", "F28", "F31"]
+    # encoder_1 =  ce.TargetEncoder()
+    # X_train[target_col] = encoder_1.fit_transform(X_train[target_col], y_train)
+    # X_valid[target_col] = encoder_1.transform(X_valid[target_col], y_valid)
+    # test[target_col] = encoder_1.transform(test[target_col])
 
     object_col = X_train.select_dtypes(include=['object']).columns
 
@@ -239,6 +314,11 @@ def preprocessing(X_train, X_valid, y_train, y_valid, test, is_test = False):
     X_train[object_col] = encoder_2.fit_transform(X_train[object_col], y_train)
     X_valid[object_col] = encoder_2.transform(X_valid[object_col], y_valid)
     test[object_col] = encoder_2.transform(test[object_col])
+    
+    ''' F17 '''
+    X_train = groupby_mean(X_train, 'F17', X_train.columns)
+    X_valid = groupby_mean(X_valid, 'F17', X_train.columns)
+    test = groupby_mean(test, 'F17', X_train.columns)
 
     ''' 결측치 처리 ''' 
     print('Missing Value')
